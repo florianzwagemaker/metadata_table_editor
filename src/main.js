@@ -5,6 +5,7 @@ import Aura from '@primeuix/themes/aura';
 import ToastService from 'primevue/toastservice';
 
 import 'primeflex/primeflex.css';
+import 'primeicons/primeicons.css';
 
 const app = createApp(App);
 
@@ -13,7 +14,8 @@ app.use(PrimeVue, {
         preset: Aura,
         options: {
             prefix: 'p',
-            darkModeSelector: 'system'
+            darkModeSelector: 'system',
+            cssLayer: false
         }
     }
 });
