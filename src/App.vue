@@ -14,6 +14,7 @@ const metadataUrl = ref('');
 const tableData = ref([]);
 const allColumns = ref([]);
 const selectedColumns = ref([]);
+const filters = ref({});
 const toast = useToast();
 const isAuthenticated = ref(false);
 const authenticationInProgress = ref(false);
@@ -160,6 +161,13 @@ async function ensureAuthenticated() {
   }
 }
 
+function initializeFilters() {
+  filters.value = {};
+  allColumns.value.forEach(col => {
+    filters.value[col.field] = { value: null, matchMode: 'contains' };
+  });
+}
+
 function loadMetadata() {
   if (!metadataUrl.value) return;
 
@@ -173,6 +181,7 @@ function loadMetadata() {
         const fields = Object.keys(results.data[0]);
         allColumns.value = fields.map(field => ({ field, header: field }));
         selectedColumns.value = fields;
+        initializeFilters(); // Initialize filters after columns are set
       }
       toast.add({ severity: 'success', summary: 'Success', detail: 'Metadata loaded successfully', life: 3000 });
     },
@@ -209,8 +218,22 @@ function resetTable() {
 }
 
 function clearLocalStorage() {
+    // Clear localStorage
     localStorage.removeItem('metadata-table-editor-state');
-    toast.add({ severity: 'warn', summary: 'Local Storage Cleared', detail: 'Please reload the page to see the changes', life: 3000 });
+    
+    // Reset application state immediately
+    tableData.value = [];
+    allColumns.value = [];
+    selectedColumns.value = [];
+    metadataUrl.value = '';
+    filters.value = {};
+    
+    toast.add({ 
+      severity: 'success', 
+      summary: 'Local Storage Cleared', 
+      detail: 'All saved data has been cleared', 
+      life: 3000 
+    });
 }
 
 async function uploadMetadata() {
@@ -301,20 +324,48 @@ watch([tableData, allColumns, selectedColumns], (newState) => {
 }, { deep: true });
 
 onMounted(async () => {
-  // First, load saved state or URL parameters for metadata
-  const savedState = localStorage.getItem('metadata-table-editor-state');
-  if (savedState) {
-    const state = JSON.parse(savedState);
-    tableData.value = state.tableData;
-    allColumns.value = state.allColumns;
-    selectedColumns.value = state.selectedColumns;
-    metadataUrl.value = state.metadataUrl;
+  // Check for URL parameters first - they should always take precedence
+  const urlParams = new URLSearchParams(window.location.search);
+  const inputMetadataUrl = urlParams.get('input-metadata');
+  
+  if (inputMetadataUrl) {
+    // URL parameters provided - use them and clear any conflicting localStorage
+    metadataUrl.value = inputMetadataUrl;
+    
+    // Reset all table state to ensure fresh start
+    tableData.value = [];
+    allColumns.value = [];
+    selectedColumns.value = [];
+    filters.value = {};
+    
+    // Clear localStorage since we're loading fresh data from URL
+    localStorage.removeItem('metadata-table-editor-state');
+    
+    // Load the new metadata
+    loadMetadata();
+    
+    toast.add({ 
+      severity: 'info', 
+      summary: 'Fresh Data Loading', 
+      detail: 'Loading new metadata from URL parameters', 
+      life: 3000 
+    });
   } else {
-    const urlParams = new URLSearchParams(window.location.search);
-    const inputMetadataUrl = urlParams.get('input-metadata');
-    if (inputMetadataUrl) {
-      metadataUrl.value = inputMetadataUrl;
-      loadMetadata();
+    // No URL parameters - try to load from localStorage
+    const savedState = localStorage.getItem('metadata-table-editor-state');
+    if (savedState) {
+      const state = JSON.parse(savedState);
+      tableData.value = state.tableData;
+      allColumns.value = state.allColumns;
+      selectedColumns.value = state.selectedColumns;
+      metadataUrl.value = state.metadataUrl;
+      
+      toast.add({ 
+        severity: 'success', 
+        summary: 'Previous Session Restored', 
+        detail: 'Loaded data from previous session', 
+        life: 3000 
+      });
     }
   }
 
@@ -446,6 +497,7 @@ onMounted(async () => {
             sortMode="multiple" 
             removableSort 
             filterDisplay="row"
+            v-model:filters="filters"
             resizableColumns 
             columnResizeMode="fit" 
             reorderableColumns 
@@ -464,7 +516,18 @@ onMounted(async () => {
               :header="col.header" 
               sortable 
               filter
+              :showFilterMenu="false"
             >
+              <template #filter="{ filterModel, filterCallback }">
+                <InputText 
+                  v-model="filterModel.value" 
+                  type="text" 
+                  @input="filterCallback()" 
+                  class="p-column-filter" 
+                  placeholder="Search..." 
+                  size="small"
+                />
+              </template>
               <template #editor="{ data, field }">
                 <InputText v-model="data[field]" class="w-full" />
               </template>
