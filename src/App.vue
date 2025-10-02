@@ -209,10 +209,6 @@ function onCellEditComplete(event) {
     toast.add({ severity: 'success', summary: 'Cell Updated', detail: `Value changed to "${newValue}"`, life: 3000 });
 }
 
-function onColReorder(event) {
-    allColumns.value = event.columns;
-}
-
 function resetTable() {
     loadMetadata();
 }
@@ -501,7 +497,6 @@ onMounted(async () => {
             resizableColumns 
             columnResizeMode="fit" 
             reorderableColumns 
-            @column-reorder="onColReorder"
             class="p-datatable-sm"
             responsiveLayout="scroll"
             :pt="{
